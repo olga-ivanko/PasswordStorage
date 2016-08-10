@@ -5,17 +5,13 @@
  */
 package ua.com.codefire.javamaven.ui;
 
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Savepoint;
 import java.sql.Statement;
 import java.util.Vector;
 import java.util.logging.Level;
@@ -34,10 +30,11 @@ import ua.com.codefire.javamaven.User;
 public class TableFrame extends javax.swing.JFrame implements NewTargetListener, DeleteApprovalListener {
 
     private static final String SQL_CONNECTION_STRING = "jdbc:sqlite:database.sl3";
-    private static final String SQL_INSERT_QUERY = "INSERT INTO storage VALUES (null, ?, ?, ?, ?)";
+    private static final String SQL_INSERT_QUERY = "INSERT INTO storage VALUES (null, ?, ?, ?, ?, ?)";
     private static final String SQL_SELECT_QUERY = "SELECT * FROM storage";
     private static final String SQL_DELETE_QUERY = "DELETE FROM storage WHERE id = ?";
     private User currentUser;
+    private boolean accessGranded;
 
     /**
      * Creates new form TableFrame
@@ -138,14 +135,14 @@ public class TableFrame extends javax.swing.JFrame implements NewTargetListener,
                         .addComponent(jcbShowPasswords)
                         .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
                     .addGroup(layout.createSequentialGroup()
-                        .addComponent(jScrollPane1, javax.swing.GroupLayout.DEFAULT_SIZE, 388, Short.MAX_VALUE)
+                        .addComponent(jScrollPane1, javax.swing.GroupLayout.DEFAULT_SIZE, 667, Short.MAX_VALUE)
                         .addContainerGap())))
         );
         layout.setVerticalGroup(
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(layout.createSequentialGroup()
                 .addContainerGap()
-                .addComponent(jScrollPane1, javax.swing.GroupLayout.DEFAULT_SIZE, 240, Short.MAX_VALUE)
+                .addComponent(jScrollPane1, javax.swing.GroupLayout.DEFAULT_SIZE, 382, Short.MAX_VALUE)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addComponent(jcbShowPasswords)
                 .addContainerGap())
@@ -173,7 +170,20 @@ public class TableFrame extends javax.swing.JFrame implements NewTargetListener,
     }//GEN-LAST:event_jmiDeleteActionPerformed
 
     private void jcbShowPasswordsActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jcbShowPasswordsActionPerformed
-
+        if (jcbShowPasswords.isSelected()) {
+            PasswordFrame pf = new PasswordFrame();
+            pf.addListener(new PasswordFrameListener() {
+                @Override
+                public void accessAction(boolean granded, User user) {
+                    accessGranded = granded;
+                    updateTableData();
+                }
+            });
+            pf.setVisible(true);
+        } else {
+            accessGranded = false;
+            updateTableData();
+        }
     }//GEN-LAST:event_jcbShowPasswordsActionPerformed
 
 
@@ -192,13 +202,19 @@ public class TableFrame extends javax.swing.JFrame implements NewTargetListener,
     private void initDatabase() {
 
         try (Connection conn = DriverManager.getConnection(SQL_CONNECTION_STRING)) {
+            conn.setAutoCommit(false);
             Statement stmt = conn.createStatement();
 
-            String createQuery = IOUtils.toString(getClass().getResourceAsStream("/create.sql"), "UTF-8");
-            stmt.execute(createQuery);
-        } catch (SQLException ex) {
-            Logger.getLogger(TableFrame.class.getName()).log(Level.SEVERE, null, ex);
-        } catch (IOException ex) {
+            stmt.execute(IOUtils.toString(getClass().getResourceAsStream("/create.users.sql"), "UTF-8"));
+            Savepoint sp = conn.setSavepoint("UsersCreated");
+            try {
+                stmt.execute(IOUtils.toString(getClass().getResourceAsStream("/create.storage.sql"), "UTF-8"));
+            } catch (SQLException e) {
+                System.out.println("roll back");
+                conn.rollback(sp);
+            }
+            conn.commit();
+        } catch (SQLException | IOException ex) {
             Logger.getLogger(TableFrame.class.getName()).log(Level.SEVERE, null, ex);
         }
     }
@@ -237,7 +253,11 @@ public class TableFrame extends javax.swing.JFrame implements NewTargetListener,
                 row.add(rs.getInt(1));
                 row.add(rs.getString(2));
                 row.add(rs.getString(3));
-                row.add(rs.getString(4).replaceAll(".+", "******"));
+                if (accessGranded) {
+                    row.add(rs.getString(4));
+                } else {
+                    row.add(rs.getString(4).replaceAll(".+", "******"));
+                }
                 row.add(rs.getString(5));
                 data.add(row);
             }
@@ -248,39 +268,6 @@ public class TableFrame extends javax.swing.JFrame implements NewTargetListener,
         DefaultTableModel dtm = new DefaultTableModel(data, columnNames);
 
         jtTable.setModel(dtm);
-
-    }
-
-    private void loadFullTableData() {
-        Vector columnNames = new Vector();
-        columnNames.add("ID");
-        columnNames.add("Target");
-        columnNames.add("Username");
-        columnNames.add("Password");
-        columnNames.add("Hash");
-
-        Vector data = new Vector();
-
-        try (Connection conn = DriverManager.getConnection(SQL_CONNECTION_STRING)) {
-            ResultSet rs = conn.createStatement().executeQuery(SQL_SELECT_QUERY);
-
-            while (rs.next()) {
-                Vector row = new Vector();
-                row.add(rs.getInt(1));
-                row.add(rs.getString(2));
-                row.add(rs.getString(3));
-                row.add(rs.getString(4));
-                row.add(rs.getString(5));
-                data.add(row);
-            }
-        } catch (SQLException ex) {
-            Logger.getLogger(TableFrame.class.getName()).log(Level.SEVERE, null, ex);
-        }
-
-        DefaultTableModel dtmFull = new DefaultTableModel(data, columnNames);
-
-        jtTable.setModel(dtmFull);
-        jtTable.repaint();
 
     }
 

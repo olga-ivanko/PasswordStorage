@@ -5,8 +5,16 @@
  */
 package ua.com.codefire.javamaven.ui;
 
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import org.apache.commons.codec.digest.DigestUtils;
 import ua.com.codefire.javamaven.User;
 
 /**
@@ -57,6 +65,7 @@ public class PasswordFrame extends javax.swing.JDialog {
         jpMessage = new javax.swing.JPanel();
         jlError = new javax.swing.JLabel();
         jpfPassword = new javax.swing.JPasswordField();
+        jbOk1 = new javax.swing.JButton();
 
         jPasswordField1.setText("jPasswordField1");
 
@@ -68,7 +77,7 @@ public class PasswordFrame extends javax.swing.JDialog {
 
         jLabel3.setText("Password:");
 
-        jbOk.setText("OK");
+        jbOk.setText("Sign in");
         jbOk.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 jbOkActionPerformed(evt);
@@ -100,6 +109,13 @@ public class PasswordFrame extends javax.swing.JDialog {
                 .addGap(0, 0, Short.MAX_VALUE))
         );
 
+        jbOk1.setText("Sign up");
+        jbOk1.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                jbOk1ActionPerformed(evt);
+            }
+        });
+
         javax.swing.GroupLayout layout = new javax.swing.GroupLayout(getContentPane());
         getContentPane().setLayout(layout);
         layout.setHorizontalGroup(
@@ -120,7 +136,8 @@ public class PasswordFrame extends javax.swing.JDialog {
                         .addComponent(jLabel1)
                         .addGap(0, 166, Short.MAX_VALUE))
                     .addGroup(layout.createSequentialGroup()
-                        .addGap(0, 0, Short.MAX_VALUE)
+                        .addComponent(jbOk1)
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                         .addComponent(jbCancel)
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                         .addComponent(jbOk)
@@ -143,7 +160,8 @@ public class PasswordFrame extends javax.swing.JDialog {
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                 .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                     .addComponent(jbCancel)
-                    .addComponent(jbOk))
+                    .addComponent(jbOk)
+                    .addComponent(jbOk1))
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addComponent(jpMessage, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addGap(9, 9, 9))
@@ -160,15 +178,41 @@ public class PasswordFrame extends javax.swing.JDialog {
     }//GEN-LAST:event_jbCancelActionPerformed
 
     private void jbOkActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jbOkActionPerformed
-        User userCredentials = new User(jtfUsername.getText(), String.valueOf(jpfPassword.getPassword()));
+        String username = jtfUsername.getText().trim();
+        String password = String.valueOf(jpfPassword.getPassword());
+
+        String hash = DigestUtils.md5Hex(password);
+        System.out.println(hash);
+
+        User userCredentials = null;
+
+        boolean granded = false;
+        try (Connection conn = DriverManager.getConnection("jdbc:sqlite:database.sl3")) {
+            PreparedStatement pstmt = conn.prepareStatement("SELECT * FROM `users` WHERE `username` = ? AND `password` = ?");
+            pstmt.setString(1, username);
+            pstmt.setString(2, hash);
+            ResultSet rs = pstmt.executeQuery();
+
+            if (rs.next()) {
+                granded = true;
+                userCredentials = new User(rs.getInt("id"), username);
+            }
+        } catch (SQLException ex) {
+            Logger.getLogger(PasswordFrame.class.getName()).log(Level.SEVERE, null, ex);
+        }
+
         //TODO: validate user.
         for (PasswordFrameListener listener : listeners) {
-            listener.accessAction(true, userCredentials);
+            listener.accessAction(granded, userCredentials);
         }
 
         dispose();
 //        this.setVisible(false);
     }//GEN-LAST:event_jbOkActionPerformed
+
+    private void jbOk1ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jbOk1ActionPerformed
+        // TODO add your handling code here:
+    }//GEN-LAST:event_jbOk1ActionPerformed
 
     /**
      * @param args the command line arguments
@@ -225,6 +269,7 @@ public class PasswordFrame extends javax.swing.JDialog {
     private javax.swing.JPasswordField jPasswordField1;
     private javax.swing.JButton jbCancel;
     private javax.swing.JButton jbOk;
+    private javax.swing.JButton jbOk1;
     private javax.swing.JLabel jlError;
     private javax.swing.JPanel jpMessage;
     private javax.swing.JPasswordField jpfPassword;
