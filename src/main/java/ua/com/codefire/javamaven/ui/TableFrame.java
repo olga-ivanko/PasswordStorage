@@ -27,24 +27,30 @@ import ua.com.codefire.javamaven.User;
  *
  * @author homefulloflove
  */
-public class TableFrame extends javax.swing.JFrame implements NewTargetListener, DeleteApprovalListener {
+public class TableFrame extends javax.swing.JFrame implements NewTargetListener, DeleteApprovalListener, PasswordFrameListener {
 
     private static final String SQL_CONNECTION_STRING = "jdbc:sqlite:database.sl3";
-    private static final String SQL_INSERT_QUERY = "INSERT INTO storage VALUES (null, ?, ?, ?, ?, ?)";
-    private static final String SQL_SELECT_QUERY = "SELECT * FROM storage";
+    private static final String SQL_INSERT_STORAGE_QUERY = "INSERT INTO storage VALUES (null, ?, ?, ?, ?, ?)";
+    private static final String SQL_INSERT_USER_QUERY = "INSERT INTO users VALUES (null, ?, ?)";
+    private static final String SQL_SELECT_STORAGE_QUERY = "SELECT * FROM storage WHERE user_id = ?";
+    private static final String SQL_SELECT_USERS_QUERY = "SELECT * FROM users";
     private static final String SQL_DELETE_QUERY = "DELETE FROM storage WHERE id = ?";
+
     private User currentUser;
     private boolean accessGranded;
 
     /**
      * Creates new form TableFrame
+     *
+     * @param currentUser
      */
-    public TableFrame() {
+    public TableFrame(User currentUser) {
+        this.currentUser = currentUser;
 
         initComponents();
-        setLocationRelativeTo(null);
 
         initDatabase();
+//        System.out.println(currentUser.getId());
         updateTableData();
 
     }
@@ -171,7 +177,7 @@ public class TableFrame extends javax.swing.JFrame implements NewTargetListener,
 
     private void jcbShowPasswordsActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jcbShowPasswordsActionPerformed
         if (jcbShowPasswords.isSelected()) {
-            PasswordFrame pf = new PasswordFrame();
+            PasswordFrame pf = new PasswordFrame(false);
             pf.addListener(new PasswordFrameListener() {
                 @Override
                 public void accessAction(boolean granded, User user) {
@@ -206,6 +212,7 @@ public class TableFrame extends javax.swing.JFrame implements NewTargetListener,
             Statement stmt = conn.createStatement();
 
             stmt.execute(IOUtils.toString(getClass().getResourceAsStream("/create.users.sql"), "UTF-8"));
+
             Savepoint sp = conn.setSavepoint("UsersCreated");
             try {
                 stmt.execute(IOUtils.toString(getClass().getResourceAsStream("/create.storage.sql"), "UTF-8"));
@@ -222,11 +229,12 @@ public class TableFrame extends javax.swing.JFrame implements NewTargetListener,
     @Override
     public void targetAdded(String target, String username, String password) {
         try (Connection conn = DriverManager.getConnection(SQL_CONNECTION_STRING)) {
-            PreparedStatement ps = conn.prepareStatement(SQL_INSERT_QUERY);
+            PreparedStatement ps = conn.prepareStatement(SQL_INSERT_STORAGE_QUERY);
             ps.setString(1, target);
             ps.setString(2, username);
             ps.setString(3, password);
             ps.setString(4, DigestUtils.md5Hex(password));
+            ps.setInt(5, currentUser.getId());
             ps.executeUpdate();
         } catch (SQLException ex) {
             Logger.getLogger(TableFrame.class.getName()).log(Level.SEVERE, null, ex);
@@ -242,11 +250,14 @@ public class TableFrame extends javax.swing.JFrame implements NewTargetListener,
         columnNames.add("Username");
         columnNames.add("Password");
         columnNames.add("Hash");
+//        columnNames.add("User_id");
 
         Vector data = new Vector();
 
         try (Connection conn = DriverManager.getConnection(SQL_CONNECTION_STRING)) {
-            ResultSet rs = conn.createStatement().executeQuery(SQL_SELECT_QUERY);
+            PreparedStatement ps = conn.prepareStatement(SQL_SELECT_STORAGE_QUERY);
+            ps.setInt(1, currentUser.getId());
+            ResultSet rs = ps.executeQuery();
 
             while (rs.next()) {
                 Vector row = new Vector();
@@ -259,6 +270,7 @@ public class TableFrame extends javax.swing.JFrame implements NewTargetListener,
                     row.add(rs.getString(4).replaceAll(".+", "******"));
                 }
                 row.add(rs.getString(5));
+//                row.add(rs.getInt(6));
                 data.add(row);
             }
         } catch (SQLException ex) {
@@ -285,4 +297,11 @@ public class TableFrame extends javax.swing.JFrame implements NewTargetListener,
         updateTableData();
     }
 
+    @Override
+    public void accessAction(boolean existing, User user) {
+        if (existing = true) {
+            setCurrentUser(user);
+            updateTableData();
+        }
+    }
 }

@@ -5,11 +5,13 @@
  */
 package ua.com.codefire.javamaven.ui;
 
+import java.awt.Color;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Level;
@@ -23,13 +25,28 @@ import ua.com.codefire.javamaven.User;
  */
 public class PasswordFrame extends javax.swing.JDialog {
 
+    private static final String SQL_CONNECTION_STRING = "jdbc:sqlite:database.sl3";
     private List<PasswordFrameListener> listeners;
+    private User userCredentials;
+    private boolean existing;
+    private static final String SQL_INSERT_USER_QUERY = "INSERT INTO users VALUES (null, ?, ?)";
 
     /**
      * Creates new form PasswordFrame
      */
     public PasswordFrame() {
         initComponents();
+
+        listeners = new ArrayList<>();
+
+        getRootPane().setDefaultButton(jbOk);
+        setLocationRelativeTo(null);
+        setModal(true);
+    }
+
+    public PasswordFrame(boolean newUserVisible) {
+        initComponents();
+        jbSignUp.setVisible(newUserVisible);
 
         listeners = new ArrayList<>();
 
@@ -56,26 +73,26 @@ public class PasswordFrame extends javax.swing.JDialog {
     private void initComponents() {
 
         jPasswordField1 = new javax.swing.JPasswordField();
-        jLabel1 = new javax.swing.JLabel();
-        jLabel2 = new javax.swing.JLabel();
+        jlInfo = new javax.swing.JLabel();
+        jlUsername = new javax.swing.JLabel();
         jtfUsername = new javax.swing.JTextField();
-        jLabel3 = new javax.swing.JLabel();
+        jlPassword = new javax.swing.JLabel();
         jbOk = new javax.swing.JButton();
         jbCancel = new javax.swing.JButton();
         jpMessage = new javax.swing.JPanel();
-        jlError = new javax.swing.JLabel();
         jpfPassword = new javax.swing.JPasswordField();
-        jbOk1 = new javax.swing.JButton();
+        jbSignUp = new javax.swing.JButton();
+        jlError = new javax.swing.JLabel();
 
         jPasswordField1.setText("jPasswordField1");
 
         setDefaultCloseOperation(javax.swing.WindowConstants.DISPOSE_ON_CLOSE);
 
-        jLabel1.setText("Type your username and password.");
+        jlInfo.setText("Type your username and password.");
 
-        jLabel2.setText("Username:");
+        jlUsername.setText("Username:");
 
-        jLabel3.setText("Password:");
+        jlPassword.setText("Password:");
 
         jbOk.setText("Sign in");
         jbOk.addActionListener(new java.awt.event.ActionListener() {
@@ -91,30 +108,27 @@ public class PasswordFrame extends javax.swing.JDialog {
             }
         });
 
-        jlError.setText(" ");
-
         javax.swing.GroupLayout jpMessageLayout = new javax.swing.GroupLayout(jpMessage);
         jpMessage.setLayout(jpMessageLayout);
         jpMessageLayout.setHorizontalGroup(
             jpMessageLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(jpMessageLayout.createSequentialGroup()
-                .addContainerGap()
-                .addComponent(jlError)
-                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+            .addGap(0, 6, Short.MAX_VALUE)
         );
         jpMessageLayout.setVerticalGroup(
             jpMessageLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(jpMessageLayout.createSequentialGroup()
-                .addComponent(jlError)
-                .addGap(0, 0, Short.MAX_VALUE))
+            .addGap(0, 0, Short.MAX_VALUE)
         );
 
-        jbOk1.setText("Sign up");
-        jbOk1.addActionListener(new java.awt.event.ActionListener() {
+        jbSignUp.setText("Sign up");
+        jbSignUp.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
-                jbOk1ActionPerformed(evt);
+                jbSignUpActionPerformed(evt);
             }
         });
+
+        jlError.setHorizontalAlignment(javax.swing.SwingConstants.RIGHT);
+        jlError.setText(" ");
+        jlError.setMaximumSize(null);
 
         javax.swing.GroupLayout layout = new javax.swing.GroupLayout(getContentPane());
         getContentPane().setLayout(layout);
@@ -123,47 +137,54 @@ public class PasswordFrame extends javax.swing.JDialog {
             .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, layout.createSequentialGroup()
                 .addContainerGap()
                 .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING)
-                    .addComponent(jpMessage, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                     .addGroup(javax.swing.GroupLayout.Alignment.LEADING, layout.createSequentialGroup()
                         .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
-                            .addComponent(jLabel3, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                            .addComponent(jLabel2, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                            .addComponent(jlPassword, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                            .addComponent(jlUsername, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                         .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                             .addComponent(jtfUsername)
-                            .addComponent(jpfPassword)))
+                            .addComponent(jpfPassword))
+                        .addContainerGap())
                     .addGroup(javax.swing.GroupLayout.Alignment.LEADING, layout.createSequentialGroup()
-                        .addComponent(jLabel1)
-                        .addGap(0, 166, Short.MAX_VALUE))
+                        .addComponent(jlInfo)
+                        .addGap(0, 0, Short.MAX_VALUE))
                     .addGroup(layout.createSequentialGroup()
-                        .addComponent(jbOk1)
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                        .addComponent(jbCancel)
+                        .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING)
+                            .addComponent(jlError, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                            .addGroup(layout.createSequentialGroup()
+                                .addComponent(jbSignUp)
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, 47, Short.MAX_VALUE)
+                                .addComponent(jbCancel)
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                                .addComponent(jbOk)))
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                        .addComponent(jbOk)
-                        .addGap(1, 1, 1)))
-                .addContainerGap())
+                        .addComponent(jpMessage, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))))
         );
         layout.setVerticalGroup(
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(layout.createSequentialGroup()
                 .addContainerGap()
-                .addComponent(jLabel1)
+                .addComponent(jlInfo)
                 .addGap(18, 18, 18)
                 .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                    .addComponent(jLabel2)
+                    .addComponent(jlUsername)
                     .addComponent(jtfUsername, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                    .addComponent(jLabel3)
+                    .addComponent(jlPassword)
                     .addComponent(jpfPassword, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                 .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                     .addComponent(jbCancel)
                     .addComponent(jbOk)
-                    .addComponent(jbOk1))
+                    .addComponent(jbSignUp))
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                .addComponent(jpMessage, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                    .addComponent(jpMessage, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                    .addGroup(layout.createSequentialGroup()
+                        .addGap(0, 0, Short.MAX_VALUE)
+                        .addComponent(jlError, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)))
                 .addGap(9, 9, 9))
         );
 
@@ -182,37 +203,69 @@ public class PasswordFrame extends javax.swing.JDialog {
         String password = String.valueOf(jpfPassword.getPassword());
 
         String hash = DigestUtils.md5Hex(password);
-        System.out.println(hash);
+//        System.out.println(hash);
 
-        User userCredentials = null;
+        userCredentials = null;
 
-        boolean granded = false;
-        try (Connection conn = DriverManager.getConnection("jdbc:sqlite:database.sl3")) {
+        try (Connection conn = DriverManager.getConnection(SQL_CONNECTION_STRING)) {
             PreparedStatement pstmt = conn.prepareStatement("SELECT * FROM `users` WHERE `username` = ? AND `password` = ?");
             pstmt.setString(1, username);
             pstmt.setString(2, hash);
             ResultSet rs = pstmt.executeQuery();
 
             if (rs.next()) {
-                granded = true;
-                userCredentials = new User(rs.getInt("id"), username);
+                existing = true;
+                userCredentials = new User(rs.getInt("id"), username, hash);
+
+                for (PasswordFrameListener listener : listeners) {
+                    listener.accessAction(existing, userCredentials);
+                }
+
+                this.dispose();
+
+            } else {
+                wrongData();
+                jbSignUp.setBackground(Color.green);
+            }
+        } catch (SQLException ex) {
+            Logger.getLogger(PasswordFrame.class.getName()).log(Level.SEVERE, null, ex);
+        }
+    }//GEN-LAST:event_jbOkActionPerformed
+
+    private void jbSignUpActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jbSignUpActionPerformed
+        String username = jtfUsername.getText().trim();
+        String password = String.valueOf(jpfPassword.getPassword());
+
+        String hash = DigestUtils.md5Hex(password);
+
+        try (Connection conn = DriverManager.getConnection(SQL_CONNECTION_STRING)) {
+            PreparedStatement pstmt = conn.prepareStatement("SELECT * FROM `users` WHERE `username` = ?");
+            pstmt.setString(1, username);
+            ResultSet rs = pstmt.executeQuery();
+
+            if (!rs.next()) {
+                pstmt = conn.prepareStatement(SQL_INSERT_USER_QUERY, Statement.RETURN_GENERATED_KEYS);
+                pstmt.setString(1, username);
+                pstmt.setString(2, hash);
+                pstmt.executeUpdate();
+
+                ResultSet rsKey = pstmt.getGeneratedKeys();
+                if (rsKey.next()) {
+                    existing = true;
+                    userCredentials = new User(rsKey.getInt(1), username, hash);
+
+                    for (PasswordFrameListener listener : listeners) {
+                        listener.accessAction(existing, userCredentials);
+                    }
+
+                    this.dispose();
+                }
             }
         } catch (SQLException ex) {
             Logger.getLogger(PasswordFrame.class.getName()).log(Level.SEVERE, null, ex);
         }
 
-        //TODO: validate user.
-        for (PasswordFrameListener listener : listeners) {
-            listener.accessAction(granded, userCredentials);
-        }
-
-        dispose();
-//        this.setVisible(false);
-    }//GEN-LAST:event_jbOkActionPerformed
-
-    private void jbOk1ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jbOk1ActionPerformed
-        // TODO add your handling code here:
-    }//GEN-LAST:event_jbOk1ActionPerformed
+    }//GEN-LAST:event_jbSignUpActionPerformed
 
     /**
      * @param args the command line arguments
@@ -250,9 +303,8 @@ public class PasswordFrame extends javax.swing.JDialog {
                     @Override
                     public void accessAction(boolean granded, User user) {
                         if (granded) {
-                            TableFrame tf = new TableFrame();
-                            tf.setCurrentUser(user);
-                            tf.setLocationRelativeTo(null);
+                            TableFrame tf = new TableFrame(user);
+                            tf.setLocationRelativeTo(pf);
                             tf.setVisible(true);
                         }
                     }
@@ -263,14 +315,14 @@ public class PasswordFrame extends javax.swing.JDialog {
     }
 
     // Variables declaration - do not modify//GEN-BEGIN:variables
-    private javax.swing.JLabel jLabel1;
-    private javax.swing.JLabel jLabel2;
-    private javax.swing.JLabel jLabel3;
     private javax.swing.JPasswordField jPasswordField1;
     private javax.swing.JButton jbCancel;
     private javax.swing.JButton jbOk;
-    private javax.swing.JButton jbOk1;
+    private javax.swing.JButton jbSignUp;
     private javax.swing.JLabel jlError;
+    private javax.swing.JLabel jlInfo;
+    private javax.swing.JLabel jlPassword;
+    private javax.swing.JLabel jlUsername;
     private javax.swing.JPanel jpMessage;
     private javax.swing.JPasswordField jpfPassword;
     private javax.swing.JTextField jtfUsername;
